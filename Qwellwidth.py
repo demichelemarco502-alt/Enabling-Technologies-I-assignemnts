@@ -1,7 +1,7 @@
 """
-Quantum-well laser for lambda = 947 nm (numpy + matplotlib only)
+Quantum-well laser for lambda = 947 nm
 
-Well      : Ga0.47In0.53As(y)P(1-y), lattice-matched to InP
+Well      : Ga0.47In0.53As(y)P(1-y)
 Barriers  : InP (not used in the energy calculation: infinite well model)
 Substrate : InP
 
@@ -10,9 +10,13 @@ Parameters (300 K), source: matprop.ru (Ioffe), GaInAsP lattice-matched to InP:
   me  = 0.08 - 0.039y               [m0]
   mhh = 0.46                        [m0]
 
+Binary lattice constants [Angstrom] (Ioffe):
+  InP 5.8687, InAs 6.0583, GaAs 5.6533, GaP 5.4505
+
 Assumptions: infinite square well, heavy holes only, e1-hh1 transition,
 ~45 meV left for the confinement energy (e1 + hh1).
-Lattice-matched well -> no strain, critical thickness practically infinite.
+Well lattice constant from Vegard's law; critical thickness from
+Matthews-Blakeslee (60-degree dislocations, Poisson ratio nu = 0.33).
 """
 import numpy as np
 import matplotlib.pyplot as plt
@@ -55,7 +59,31 @@ print(f"\nWell width L = {L:.2f} nm")
 print(f"e1 = {E1e*1e3:.1f} meV, hh1 = {E1h*1e3:.1f} meV")
 print(f"e1-hh1 transition = {E_tr:.4f} eV -> lambda = {hc/E_tr:.1f} nm")
 
-# 5) Band diagram (zero = valence band edge of the well)
+# 5) Strain and critical thickness
+#    Vegard's law for Ga(x)In(1-x)As(y)P(1-y):
+#    a = x y a_GaAs + x (1-y) a_GaP + (1-x) y a_InAs + (1-x)(1-y) a_InP
+x = 0.47
+a_InP, a_InAs, a_GaAs, a_GaP = 5.8687, 6.0583, 5.6533, 5.4505
+a_w = (x * y * a_GaAs + x * (1 - y) * a_GaP
+       + (1 - x) * y * a_InAs + (1 - x) * (1 - y) * a_InP)
+f = (a_w - a_InP) / a_InP        # lattice mismatch (< 0: tensile)
+
+#    Matthews-Blakeslee, 60-deg dislocations (cos(alpha) = cos(lambda) = 1/2):
+#    h_c = b (1 - nu/4) / (2 pi |f| (1 + nu) / 2) * (ln(h_c / b) + 1)
+#    b = a_InP / sqrt(2) (Burgers vector); h_c on both sides -> iterate
+nu = 0.33
+b = a_InP / np.sqrt(2) * 0.1     # nm
+h_c = 10.0                       # initial guess [nm]
+for _ in range(100):
+    h_c = (b * (1 - nu / 4) / (np.pi * abs(f) * (1 + nu))
+           * (np.log(h_c / b) + 1))
+
+print(f"\nLattice constant: well {a_w:.4f} A, InP {a_InP:.4f} A")
+print(f"Mismatch f = {f*100:.2f} % ({'tensile' if f < 0 else 'compressive'})")
+print(f"Critical thickness h_c = {h_c:.1f} nm")
+print(f"L = {L:.1f} nm < h_c: {L < h_c}")
+
+# 6) Band diagram (zero = valence band edge of the well)
 #    InP barriers drawn for reference only (2/3 - 1/3 band offset rule)
 dEc, dEv = 2 / 3 * (1.344 - Eg), 1 / 3 * (1.344 - Eg)
 print(f"InP barriers: dEc = {dEc*1e3:.0f} meV, dEv = {dEv*1e3:.0f} meV")
